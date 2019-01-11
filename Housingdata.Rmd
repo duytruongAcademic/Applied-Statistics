@@ -1,0 +1,129 @@
+---
+title: "Appendix"
+author: "Duy Truong"
+date: "10/25/2018"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+  
+  
+```{r}
+library(qwraps2)
+library(GGally)
+library("Hmisc")
+library(ggcorrplot)
+library(ggplot2)
+library(car)
+library(readxl)
+library(tidyverse)
+
+Housing_data <- read_excel("Housing data.xlsx")
+
+```
+
+
+  
+Data transformation
+```{r}
+
+Housing_data$taxModified<-as.numeric(Housing_data$TAX)
+
+```
+NA Analysis
+```{r}
+
+#create a new dataframe with omitted na data
+HousingUpdate <- na.omit(Housing_data)
+
+```
+
+
+
+Identify outlier
+```{r}
+#fit a model without data modification and na data
+fit<- lm(MEDV ~ CRIM + ZN + CHAS + RM + AGE + DIS + log(RAD) + taxModified + PTRATIO + LSTAT, data=HousingUpdate)
+summary(fit)
+#apply cook's distance to identify outliers in the model
+cookD <-cooks.distance(fit)
+#plot the cook distance to measure how many outliers
+plot(cookD)
+abline(h = 4*mean(cookD), col="red")
+#introduce new data with outliers
+outlier <- as.numeric(names(cookD)[(cookD > 4*mean(cookD))])
+
+```
+
+
+
+
+
+
+
+New model with removed outliers
+```{r}
+#new dataframe without outlier and na data
+HousingClean <-HousingUpdate[-outlier, ]
+#count how many rows are left after  cutting the outliers to get the observation numbers
+nrow(HousingClean)
+#Final model
+fitUpdate<- lm(MEDV ~ CRIM + CHAS+ZN + RM + AGE + DIS + log(RAD) + taxModified + PTRATIO + log(LSTAT), data=HousingClean)
+
+
+```
+
+Correlation table
+```{r}
+HousingCleanCorr <- HousingClean[,c(13,1,2,3,4,6,7,8,9,11,14)]
+cor(HousingCleanCorr)
+```
+
+Condition check
+
+1. Linear model
+
+Correlation of each variable to response variable
+```{r}
+#Graph showing relationship between median house price and the proportion population
+ggplot(data=HousingClean) +
+  geom_point(mapping = aes(x = log(LSTAT) , y = MEDV))+
+  geom_smooth(mapping = aes(x = log(LSTAT)  , y = MEDV))+
+  labs(x='Log of proportion of lower population', y='Median value of house price')
+#Graph showing relationship between median house price and the room number
+ggplot(data=HousingClean) +
+  geom_point(mapping = aes(x =RM, y = MEDV))+
+  geom_smooth(mapping = aes(x = RM  , y = MEDV), col='red')+
+  labs(x='Room number',y='Median value of house price')
+  
+
+```
+
+
+2. Multicollearity check
+```{r}
+vif(fitUpdate)
+
+```
+All values are under an acceptable range
+3. Multivariate normality
+
+```{r}
+qqPlot(fitUpdate)
+```
+
+The residuals follows a normal distribution, which satisfies the multivariate condition
+
+4.Homoscedasticity
+```{r}
+
+plot(fitUpdate$fit, fitUpdate$residual, ylab="residual", xlab="predicted median price")
+abline(0,0)
+
+
+
+```
+
+The graph shows no pattern in the distribution, therefore satisfying the homoscedasticity condition.
+
